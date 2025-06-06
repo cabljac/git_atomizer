@@ -11,6 +11,14 @@ struct Cli {
     branch: Option<String>,
 }
 
+// I wanted to factor this out, but:
+// 1. is it even worth doing? we could add common with_context I guess, just thinking DRY
+// 2. I was having issues with lifecycle ' annotations, they're something i haven't learnt much of yet
+// fn get_reference(repo: &gix::Repository, ref_name: &str) -> Result<gix::Reference> {
+//     repo.find_reference(ref_name)
+//         .context("Failed to find reference")
+// }
+
 fn print_branch_commit(
     repo: &gix::Repository,
     ref_name: &str,
@@ -34,6 +42,51 @@ fn print_branch_commit(
     Ok(())
 }
 
+// Add this function after print_branch_commit
+fn explore_commit_tree(repo: &gix::Repository, ref_name: &str) -> Result<()> {
+    // Note anyhow doesn't need to provide the Box pointer type annotation, i think it comes with it.
+
+    // TODO: Your task is to:
+    // 1. Get the reference (similar to print_branch_commit)
+
+    let mut reference = repo
+        .find_reference(ref_name)
+        .context("Failed to get reference")?;
+
+    let commit = reference
+        .peel_to_commit()
+        .context("Failed to peel to commit")?;
+
+    let tree = commit.tree().context("Failed to get tree from commit")?;
+
+    //  this errors with "no method named `context` found for struct `gix::Id<'_>` in the current scope"
+
+    // I suppose id is not a Result<> type? So cannot be matched/unwrapped
+    // let id = tree.id().context(|| "Cound not get tree ID")?;
+
+    let id = tree.id();
+
+    println!("Tree ID: {}", id);
+
+    // Or like this? or is Object ID different or something:
+
+    // Answer:
+    // tree.id would access a public field directly
+    // tree.id() calls a method
+    // The Id type implements Display, so can use println! macro.
+
+    // println!("Tree ID: {}", tree.id);
+
+    // 2. Peel to commit
+    // 3. Get the tree from the commit using commit.tree()?
+    // 4. Print the tree id using tree.id
+    // 5. Iterate through tree entries and print their names
+    //    Hint: use tree.iter() and for entry in ... pattern
+    //    Each entry has a filename() method that returns a BString
+
+    Ok(())
+}
+
 fn main() {
     let args = Cli::parse();
 
@@ -53,25 +106,30 @@ fn main() {
         }
     };
     // So a Result is Ok or Err
-    let head_name = match repo.head_name() {
-        Ok(name) => name,
-        Err(e) => {
-            println!("Error: could not read HEAD, is repository corrupted? {}", e);
-            return;
-        }
-    };
+    // let head_name = match repo.head_name() {
+    //     Ok(name) => name,
+    //     Err(e) => {
+    //         println!("Error: could not read HEAD, is repository corrupted? {}", e);
+    //         return;
+    //     }
+    // };
 
     match print_branch_commit(&repo, &branch, "specified branch") {
         Ok(_) => {}
         Err(e) => println!("Error: {}", e),
     }
 
-    if let Some(head_name) = head_name {
-        let head_str = head_name.to_string();
-
-        match print_branch_commit(&repo, &head_str, "current HEAD") {
-            Ok(_) => {}
-            Err(e) => println!("Error: {}", e),
-        }
+    match explore_commit_tree(&repo, &branch) {
+        Ok(_) => {}
+        Err(e) => println!("Error exploring tree: {}", e),
     }
+
+    // if let Some(head_name) = head_name {
+    //     let head_str = head_name.to_string();
+
+    //     match print_branch_commit(&repo, &head_str, "current HEAD") {
+    //         Ok(_) => {}
+    //         Err(e) => println!("Error: {}", e),
+    //     }
+    // }
 }
