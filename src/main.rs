@@ -1,3 +1,5 @@
+// anyhow Error wraps any Error
+use anyhow::{Context, Result};
 use clap::Parser;
 use gix::{self};
 
@@ -16,9 +18,17 @@ fn print_branch_commit(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Box is smart pointer, enables dynamic sizing because only need to know pointer at compile time
 
-    let mut reference = repo.find_reference(ref_name)?;
-    let commit = reference.peel_to_commit()?;
-    let message = commit.message()?;
+    let mut reference = repo
+        .find_reference(ref_name)
+        .with_context(|| format!("Cannot find reference for {}", label))?;
+
+    // anyhow context or with_context converts to Result
+
+    let commit = reference
+        .peel_to_commit()
+        .context("Failed to peel reference from commit")?;
+
+    let message = commit.message().context("Failed to read commit message")?;
 
     println!("Latest commit on on {}: {}", label, message.summary());
     Ok(())
