@@ -24,17 +24,25 @@ impl<'a> Scanner<'a> {
 
         self.position += spaces_skipped;
 
-        match trimmed.find(char::is_whitespace) {
-            Some(end) => {
-                let word = Some(&self.text[self.position..(self.position + end)]);
-                self.position += end;
-                return word;
-            }
-            None => {
-                self.position += trimmed.len();
-                Some(&trimmed)
-            }
-        }
+        let end = trimmed.find(char::is_whitespace).unwrap_or(trimmed.len());
+
+        let word = &self.text[self.position..self.position + end];
+
+        self.position += end;
+
+        Some(word)
+
+        // match trimmed.find(char::is_whitespace) {
+        //     Some(end) => {
+        //         let word = Some(&self.text[self.position..(self.position + end)]);
+        //         self.position += end;
+        //         return word;
+        //     }
+        //     None => {
+        //         self.position += trimmed.len();
+        //         Some(&trimmed)
+        //     }
+        // }
     }
 }
 
