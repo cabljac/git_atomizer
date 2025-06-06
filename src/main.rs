@@ -98,6 +98,33 @@ fn explore_commit_tree(repo: &gix::Repository, ref_name: &str) -> Result<()> {
     Ok(())
 }
 
+fn get_commit_from_ref<'a>(repo: &'a gix::Repository, ref1: &'a str) -> Result<gix::Commit<'a>> {
+    let mut reference = repo.find_reference(ref1).context("...")?;
+    reference
+        .peel_to_commit()
+        .context("Failed to peel reference from commit")
+}
+
+fn _get_commit_from_ref_2<'a>(repo: &'a gix::Repository, ref1: &'a str) -> Result<gix::Commit<'a>> {
+    let mut reference = repo.find_reference(ref1).context("...")?;
+    Ok(reference
+        .peel_to_commit()
+        .context("Failed to peel reference from commit")?)
+}
+
+fn compare_commits(repo: &gix::Repository, ref1: &str, ref2: &str) -> Result<()> {
+    let commit1 = get_commit_from_ref(repo, ref1)
+        .with_context(|| format!("Failed to get commit {}", ref1))?;
+    let commit2 = get_commit_from_ref(repo, ref2)
+        .with_context(|| format!("Failed to get commit {}", ref2))?;
+
+    println!("Comparing commits {}, {}", commit1.id(), commit2.id());
+
+    Ok(())
+
+    // gix::diff::tree_with_rewrites
+}
+
 fn main() {
     let args = Cli::parse();
 
@@ -133,6 +160,11 @@ fn main() {
     match explore_commit_tree(&repo, &branch) {
         Ok(_) => {}
         Err(e) => println!("Error exploring tree: {}", e),
+    }
+
+    match compare_commits(&repo, &branch, &branch) {
+        Ok(_) => {}
+        Err(e) => println!("Error comparing commits {}", e),
     }
 
     // if let Some(head_name) = head_name {
