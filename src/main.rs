@@ -6,9 +6,12 @@ use gix::{self};
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Cli {
-    /// Name of the person to greet
+    /// lhs of compare
     #[arg(short, long)]
-    branch: Option<String>,
+    feature: Option<String>,
+    // rhs of compare
+    #[arg(short, long)]
+    base: Option<String>,
 }
 
 // I wanted to factor this out, but:
@@ -27,8 +30,6 @@ fn _get_reference<'a>(repo: &'a gix::Repository, ref_name: &str) -> Result<gix::
 //     get_reference(&repo, "main")?
 // };  // repo dropped here!
 // reference points to freed memory - Rust says NO!
-
-// 2. Not really, since it's a tiny bit of code. better to extract get_commit_from_reference or something
 
 fn print_branch_commit(
     repo: &gix::Repository,
@@ -111,6 +112,7 @@ fn print_changes(changes: Vec<gix::diff::tree::recorder::Change>) {
     } else {
         println!("\nFound {} changes:", changes.len());
         for change in changes {
+            // pattern match in gix
             match change {
                 gix::diff::tree::recorder::Change::Addition {
                     entry_mode,
@@ -177,24 +179,27 @@ fn compare_commits(repo: &gix::Repository, ref1: &str, ref2: &str) -> Result<()>
     println!("Commit 1: {}", commit1.id());
     println!("Commit 2: {}", commit2.id());
 
-    // Check if they're the same commit
     if commit1.id() == commit2.id() {
         println!("Both references point to the same commit!");
         return Ok(());
     }
 
-    // Use gix::diff::tree::Recorder to collect changes
+    // visitor which collects all changes as the diff alg runs
     let mut recorder = gix::diff::tree::Recorder::default();
 
-    // Get the object database handle
+    // database where Git stores all objects
+    // into_arc is "atomic reference counter"
+    // diff algorithm needs this to look up object details during comparison
     let object_db = repo.objects.clone().into_arc()?;
 
-    // Create a reusable state for the diff operation
+    // holds temporary state during diff (buffers etc) mostly for efficiency
     let mut diff_state = gix::diff::tree::State::default();
 
-    // Perform the diff with the recorder
+    // TreeRefIter parses raw bytes, iterating through tree entries, efficient for large trees
     let tree1_iter = gix::objs::TreeRefIter::from_bytes(&tree1.data);
     let tree2_iter = gix::objs::TreeRefIter::from_bytes(&tree2.data);
+
+    // perform diff
     gix::diff::tree(
         tree1_iter,
         tree2_iter,
@@ -203,7 +208,7 @@ fn compare_commits(repo: &gix::Repository, ref1: &str, ref2: &str) -> Result<()>
         &mut recorder,
     )?;
 
-    // Get the recorded changes
+    // extract changes stored on the recorder
     let changes = recorder.records;
 
     print_changes(changes);
@@ -213,7 +218,15 @@ fn compare_commits(repo: &gix::Repository, ref1: &str, ref2: &str) -> Result<()>
 fn main() {
     let args = Cli::parse();
 
-    let branch = if let Some(branch_name) = args.branch {
+    let branch_1 = if let Some(branch_name) = args.feature {
+        println!("Specified branch: {}", branch_name);
+        branch_name
+    } else {
+        println!("No branch specified, using main");
+        String::from("main")
+    };
+
+    let branch_2 = if let Some(branch_name) = args.base {
         println!("Specified branch: {}", branch_name);
         branch_name
     } else {
@@ -237,17 +250,17 @@ fn main() {
     //     }
     // };
 
-    match print_branch_commit(&repo, &branch, "specified branch") {
+    match print_branch_commit(&repo, &branch_1, "specified branch") {
         Ok(_) => {}
         Err(e) => println!("Error: {}", e),
     }
 
-    match explore_commit_tree(&repo, &branch) {
+    match explore_commit_tree(&repo, &branch_1) {
         Ok(_) => {}
         Err(e) => println!("Error exploring tree: {}", e),
     }
 
-    match compare_commits(&repo, &branch, &branch) {
+    match compare_commits(&repo, &branch_1, &branch_2) {
         Ok(_) => {}
         Err(e) => println!("Error comparing commits {}", e),
     }
