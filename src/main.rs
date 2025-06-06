@@ -1,4 +1,5 @@
 use clap::Parser;
+use gix;
 
 /// test description!
 #[derive(Parser, Debug)]
@@ -12,8 +13,11 @@ struct Cli {
 fn main() {
     let args = Cli::parse();
 
-    match args.branch {
-        Some(branch_name) => println!("Looking at branch {}", branch_name),
-        None => println!("No branch specified"),
-    }
+    let branch = if let Some(branch_name) = args.branch {
+        println!("Specified branch: {}", branch_name);
+        branch_name
+    } else {
+        println!("No branch specified, using main");
+        String::from("main")
+    };
 }
