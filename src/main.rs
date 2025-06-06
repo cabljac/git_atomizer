@@ -14,10 +14,21 @@ struct Cli {
 // I wanted to factor this out, but:
 // 1. is it even worth doing? we could add common with_context I guess, just thinking DRY
 // 2. I was having issues with lifecycle ' annotations, they're something i haven't learnt much of yet
-// fn get_reference(repo: &gix::Repository, ref_name: &str) -> Result<gix::Reference> {
-//     repo.find_reference(ref_name)
-//         .context("Failed to find reference")
-// }
+fn _get_reference<'a>(repo: &'a gix::Repository, ref_name: &str) -> Result<gix::Reference<'a>> {
+    repo.find_reference(ref_name)
+        .context("Failed to find reference")
+}
+
+// 1.
+
+// This would be dangerous!
+// let reference = {
+//     let repo = gix::discover(".")?;
+//     get_reference(&repo, "main")?
+// };  // repo dropped here!
+// reference points to freed memory - Rust says NO!
+
+// 2. Not really, since it's a tiny bit of code. better to extract get_commit_from_reference or something
 
 fn print_branch_commit(
     repo: &gix::Repository,
