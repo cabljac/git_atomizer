@@ -1,13 +1,27 @@
 use clap::Parser;
 use gix::{self};
 
-/// test description!
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Cli {
     /// Name of the person to greet
     #[arg(short, long)]
     branch: Option<String>,
+}
+
+fn print_branch_commit(
+    repo: &gix::Repository,
+    ref_name: &str,
+    label: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // Box is smart pointer, enables dynamic sizing because only need to know pointer at compile time
+
+    let mut reference = repo.find_reference(ref_name)?;
+    let commit = reference.peel_to_commit()?;
+    let message = commit.message()?;
+
+    println!("Latest commit on on {}: {}", label, message.summary());
+    Ok(())
 }
 
 fn main() {
@@ -28,9 +42,6 @@ fn main() {
             return;
         }
     };
-
-    // We should probably match? or
-
     // So a Result is Ok or Err
     let head_name = match repo.head_name() {
         Ok(name) => name,
@@ -40,67 +51,17 @@ fn main() {
         }
     };
 
-    let mut reference = match repo.find_reference(&branch) {
-        Ok(reference) => reference,
-        Err(e) => {
-            println!("Error: cannot find reference for branch, {}", e);
-            return;
-        }
-    };
-
-    let commit = match reference.peel_to_commit() {
-        Ok(commit) => commit,
-        Err(e) => {
-            println!("Error: could not peel, {}", e);
-            return;
-        }
-    };
-
-    let message = match commit.message() {
-        Ok(message) => message,
-        Err(e) => {
-            println!("Error: could not get message from commit {}", e);
-            return;
-        }
-    };
-
-    println!("Latest commit on specified branch: {}", message.summary());
-    // or
-    println!("Latest commit message from specified branch: {:?}", message);
+    match print_branch_commit(&repo, &branch, "specified branch") {
+        Ok(_) => {}
+        Err(e) => println!("Error: {}", e),
+    }
 
     if let Some(head_name) = head_name {
         let head_str = head_name.to_string();
 
-        let branch_name = head_str.strip_prefix("refs/heads/").unwrap_or(&head_str);
-        println!("On branch {}", branch_name);
-
-        let mut reference = match repo.find_reference(&head_name) {
-            Ok(reference) => reference,
-            Err(e) => {
-                println!("Error: could not find reference, {}", e);
-                return;
-            }
-        };
-
-        let commit = match reference.peel_to_commit() {
-            Ok(commit) => commit,
-            Err(e) => {
-                println!("Error: could not peel, {}", e);
-                return;
-            }
-        };
-
-        let message = match commit.message() {
-            Ok(message) => message,
-            Err(e) => {
-                println!("Error: could not get message from commit {}", e);
-                return;
-            }
-        };
-
-        // Add this:
-        println!("Latest commit on head: {}", message.summary());
-        // or
-        println!("Latest commit message from head: {:?}", message);
+        match print_branch_commit(&repo, &head_str, "current HEAD") {
+            Ok(_) => {}
+            Err(e) => println!("Error: {}", e),
+        }
     }
 }
