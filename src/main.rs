@@ -105,24 +105,109 @@ fn get_commit_from_ref<'a>(repo: &'a gix::Repository, ref1: &'a str) -> Result<g
         .context("Failed to peel reference from commit")
 }
 
-fn _get_commit_from_ref_2<'a>(repo: &'a gix::Repository, ref1: &'a str) -> Result<gix::Commit<'a>> {
-    let mut reference = repo.find_reference(ref1).context("...")?;
-    Ok(reference
-        .peel_to_commit()
-        .context("Failed to peel reference from commit")?)
+fn print_changes(changes: Vec<gix::diff::tree::recorder::Change>) {
+    if changes.is_empty() {
+        println!("No differences found between the commits.");
+    } else {
+        println!("\nFound {} changes:", changes.len());
+        for change in changes {
+            match change {
+                gix::diff::tree::recorder::Change::Addition {
+                    entry_mode,
+                    oid,
+                    path,
+                    ..
+                } => {
+                    println!(
+                        "  + {} ({:?}, {})",
+                        path.to_string(),
+                        entry_mode.kind(),
+                        oid
+                    );
+                }
+                gix::diff::tree::recorder::Change::Deletion {
+                    entry_mode,
+                    oid,
+                    path,
+                    ..
+                } => {
+                    println!(
+                        "  - {} ({:?}, {})",
+                        path.to_string(),
+                        entry_mode.kind(),
+                        oid
+                    );
+                }
+                gix::diff::tree::recorder::Change::Modification {
+                    previous_entry_mode,
+                    previous_oid,
+                    entry_mode,
+                    oid,
+                    path,
+                    ..
+                } => {
+                    println!(
+                        "  M {} ({:?} {} -> {:?} {})",
+                        path.to_string(),
+                        previous_entry_mode.kind(),
+                        previous_oid,
+                        entry_mode.kind(),
+                        oid
+                    );
+                }
+            }
+        }
+    }
 }
 
 fn compare_commits(repo: &gix::Repository, ref1: &str, ref2: &str) -> Result<()> {
-    let commit1 = get_commit_from_ref(repo, ref1)
-        .with_context(|| format!("Failed to get commit {}", ref1))?;
-    let commit2 = get_commit_from_ref(repo, ref2)
-        .with_context(|| format!("Failed to get commit {}", ref2))?;
+    // Get both commits
+    let commit1 = get_commit_from_ref(repo, ref1)?;
+    let commit2 = get_commit_from_ref(repo, ref2)?;
 
-    println!("Comparing commits {}, {}", commit1.id(), commit2.id());
+    // Get the trees from both commits
+    let tree1 = commit1
+        .tree()
+        .context("Failed to get tree from first commit")?;
+    let tree2 = commit2
+        .tree()
+        .context("Failed to get tree from second commit")?;
 
+    println!("\nComparing {} and {}:", ref1, ref2);
+    println!("Commit 1: {}", commit1.id());
+    println!("Commit 2: {}", commit2.id());
+
+    // Check if they're the same commit
+    if commit1.id() == commit2.id() {
+        println!("Both references point to the same commit!");
+        return Ok(());
+    }
+
+    // Use gix::diff::tree::Recorder to collect changes
+    let mut recorder = gix::diff::tree::Recorder::default();
+
+    // Get the object database handle
+    let object_db = repo.objects.clone().into_arc()?;
+
+    // Create a reusable state for the diff operation
+    let mut diff_state = gix::diff::tree::State::default();
+
+    // Perform the diff with the recorder
+    let tree1_iter = gix::objs::TreeRefIter::from_bytes(&tree1.data);
+    let tree2_iter = gix::objs::TreeRefIter::from_bytes(&tree2.data);
+    gix::diff::tree(
+        tree1_iter,
+        tree2_iter,
+        &mut diff_state,
+        &object_db,
+        &mut recorder,
+    )?;
+
+    // Get the recorded changes
+    let changes = recorder.records;
+
+    print_changes(changes);
     Ok(())
-
-    // gix::diff::tree_with_rewrites
 }
 
 fn main() {
