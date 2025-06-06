@@ -1,5 +1,5 @@
 use clap::Parser;
-use gix;
+use gix::{self, refs::FullName};
 
 /// test description!
 #[derive(Parser, Debug)]
@@ -21,8 +21,29 @@ fn main() {
         String::from("main")
     };
 
-    match gix::discover(".") {
-        Ok(_repo) => println!("Found a git repository!"),
-        Err(e) => println!("Error: Not in a git repository - {}", e),
+    let repo = match gix::discover(".") {
+        Ok(repo) => repo,
+        Err(e) => {
+            println!("Error: Not in a git repository - {}", e);
+            return;
+        }
+    };
+
+    // We should probably match? or
+
+    // So a Result is Ok or Err
+    let head_name = match repo.head_name() {
+        Ok(name) => name,
+        Err(e) => {
+            println!("Error: could not read HEAD, is repository corrupted? {}", e);
+            return;
+        }
+    };
+
+    if let Some(head_name) = head_name {
+        let head_str = head_name.to_string();
+
+        let branch_name = head_str.strip_prefix("refs/heads/").unwrap_or(&head_str);
+        println!("On branch {}", branch_name);
     }
 }
