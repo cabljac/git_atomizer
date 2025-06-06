@@ -11,12 +11,30 @@ impl<'a> Scanner<'a> {
 
     // TODO: Implement this method
     // It should return the next word and advance the position
-    fn next_word(&mut self) -> Option<&str> {
-        // Skip any leading spaces
-        // Find the next word
-        // Update self.position
-        // Return Some(&str) or None if no more words
-        todo!()
+    fn next_word(&mut self) -> Option<&'a str> {
+        let remaining = &self.text[self.position..];
+
+        let trimmed = remaining.trim_start();
+
+        if trimmed.is_empty() {
+            return None;
+        }
+
+        let spaces_skipped = remaining.len() - trimmed.len();
+
+        self.position += spaces_skipped;
+
+        match trimmed.find(char::is_whitespace) {
+            Some(end) => {
+                let word = Some(&self.text[self.position..(self.position + end)]);
+                self.position += end;
+                return word;
+            }
+            None => {
+                self.position += trimmed.len();
+                Some(&trimmed)
+            }
+        }
     }
 }
 
