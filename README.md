@@ -25,6 +25,7 @@ Large pull requests are hard to review. This tool aims to help developers break 
 - [ ] Automatic commit message generation
 - [ ] Integration tests with real repositories
 - [ ] Performance optimization for large diffs
+- [ ] Validation that proposed commits chain is equivalent
 
 ## Architecture
 
